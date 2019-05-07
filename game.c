@@ -7,8 +7,6 @@
 
 #include "graphics.h"
 
-#define MAX_TIMER 30
-#define MAX_TIMER_BANDIT 30
 #define MAX_SPRITE 16
 #define MAX_MOB_SPRITE 4
 #define NB_BANDIT 3
@@ -16,6 +14,9 @@
 #define BANDIT_FOLLOW 2
 #define MAX_TIMER_SCROLLBKG 10
 #define HAMMER_DISTANCE 8
+
+UBYTE MAX_TIMER = 10;
+UBYTE MAX_TIMER_BANDIT = 10;
 
 typedef struct Bandit{
   UBYTE pv;
@@ -30,22 +31,25 @@ typedef struct Bandit{
   UBYTE isWalkingBandit;
   UBYTE isAttackingBandit;
   UBYTE isDyingBandit;
-  
+  UBYTE isNotHere;
+
 } Bandit;
 
 Bandit bandits[NB_BANDIT];
 UBYTE pickComportement;
 
+UBYTE nbBanditToDraw = 3;
+
 UBYTE posXJudge = 80;
 UBYTE posYJudge = 100;
 
+UBYTE posXShock = posXJudge;
+UBYTE posYShock = posYJudge;
 
-UBYTE JudgeSpeed = 2;
-UBYTE JudgeJumbSpeed = 2;
+UBYTE shockSend = 0;
+
+UBYTE JudgeSpeed = 4;
 UBYTE JudgePV = 3;
-
-UBYTE ScoreDistance = 0;
-UBYTE ScoreKill = 0;
 
 UBYTE TimerAnimationWalk = MAX_TIMER;
 UBYTE TimerAnimationJump = MAX_TIMER;
@@ -53,11 +57,11 @@ UBYTE TimerAnimationAttack = MAX_TIMER;
 UBYTE TimerAnimationHurt = MAX_TIMER/2;
 UBYTE TimerScrollBKG = MAX_TIMER_SCROLLBKG;
 
-UBYTE isJumping = 0;
 UBYTE isWalking = 0;
 UBYTE isAttacking = 0;
 UBYTE isHurt = 0;
 UBYTE i = 0;
+UBYTE  j = 0;
 
 UBYTE borderRight = SCREENWIDTH-4;
 UBYTE borderLeft = 4;
@@ -69,13 +73,30 @@ UBYTE hammerPos = posXJudge + HAMMER_DISTANCE;
 UBYTE score_bandit_digitUn = 0;
 UBYTE score_bandit_digitDeux = 0;
 UBYTE score_bandit_digitTrois = 0;
+UBYTE score_bandit = 0;
 
-UBYTE distance = 0;
 
-UBYTE score_distance_digitUn = 0;
-UBYTE score_distance_digitDeux = 0;
-UBYTE score_distance_digitTrois = 0;
+UBYTE score_villager = 10;
+UBYTE score_villager_digitUn = 0;
+UBYTE score_villager_digitDeux = 1;
 
+UBYTE gameIsLaunch = 0;
+UBYTE isGameOver = 0;
+UBYTE bestScore = 0;
+
+
+
+void sound_jump(){
+  NR52_REG = 0x80;
+  NR51_REG = 0x11;
+  NR50_REG = 0x77;
+
+  NR10_REG = 0x1E;
+  NR11_REG = 0x10;
+  NR12_REG = 0xF3;
+  NR13_REG = 0x00;
+  NR14_REG = 0x87;
+}
 
 
 void drawBanditIdle(UBYTE numero, UBYTE posX, UBYTE posY);
@@ -86,8 +107,69 @@ void checkCollideBorder(UBYTE newPosX, UBYTE newPosY);
 
 void checkColliderHammerAttack();
 void JudgeDoHurt();
-void drawJudgeAttack1(){
 
+void drawjudgeShockWave(){
+
+  set_sprite_data(32, 1, Shock);
+
+  set_sprite_tile(32, 32);
+
+  posXShock = posXJudge+18;
+  posYShock = (posYJudge+14);
+
+  move_sprite(32, posXShock ,posYShock);
+
+  set_win_tiles(3, 0, 1, 1, jumpLook);
+}
+
+void checkBanditScore(){
+        if(score_bandit_digitUn > 9){
+          score_bandit_digitUn = 0;
+          score_bandit_digitDeux++;
+        }
+        if(score_bandit_digitDeux > 9){
+          score_bandit_digitDeux = 0;
+          score_bandit_digitTrois++;
+        }
+        if(score_bandit_digitTrois > 9){
+          score_bandit_digitUn = 0;
+          score_bandit_digitDeux = 0;
+          score_bandit_digitTrois = 0;
+        }
+}
+
+void checkCollideShockAttack(){
+
+    for(i = 0; i < nbBanditToDraw; i++){
+       if(bandits[i].pv == 1 && bandits[i].isDyingBandit == 0){
+          if(bandits[i].PosX < posXShock+8 && bandits[i].PosX > posXShock && bandits[i].PosY < posYShock+16  && bandits[i].PosY > posYShock-8){
+                    bandits[i].isDyingBandit = 1;
+                    score_bandit++;
+                    score_bandit_digitUn++;
+                    checkBanditScore();
+          }
+        }
+      }
+
+      if(posXShock > borderRight + 10){
+        shockSend = 0;
+      }
+
+}
+
+void moveShockWave(){
+
+  if(gameIsLaunch == 1){
+      posXShock+= 2;
+  }
+
+  move_sprite(32, posXShock ,posYShock);
+
+  checkCollideShockAttack();
+
+}
+
+void drawJudgeAttack1(){
 
   set_sprite_data(0, MAX_SPRITE, JUDGEATTACK1);
 
@@ -141,8 +223,10 @@ void drawJudgeAttack1(){
   set_sprite_tile(15, 15);
   move_sprite(15, -5, -5);
 
-  
-  set_win_tiles(3, 0, 1, 1, attackLook);
+
+  if(shockSend == 0){
+        set_win_tiles(3, 0, 1, 1, attackLook);
+    }
 
 
 }
@@ -155,7 +239,7 @@ void drawJudgeAttack2(){
 
   set_sprite_tile(0, 0);
   move_sprite(0, posXJudge-8, posYJudge-8);
-  
+
   set_sprite_tile(1, 1);
   move_sprite(1, posXJudge-8, posYJudge);
 
@@ -204,8 +288,11 @@ void drawJudgeAttack2(){
   set_sprite_tile(15, 15);
   move_sprite(15, posXJudge+16, posYJudge+16);
 
-  set_win_tiles(3, 0, 1, 1, attackLook);
-  
+    if(shockSend == 0){
+        set_win_tiles(3, 0, 1, 1, attackLook);
+    }
+
+
 }
 void drawJudgeIDLE(){
 
@@ -213,7 +300,7 @@ void drawJudgeIDLE(){
 
   set_sprite_tile(0, 0);
   move_sprite(0, posXJudge-8, posYJudge-8);
-  
+
   set_sprite_tile(1, 1);
   move_sprite(1, posXJudge-8, posYJudge);
 
@@ -264,67 +351,6 @@ void drawJudgeIDLE(){
   set_win_tiles(3, 0, 1, 1, simpleLook);
 }
 
-void drawJudgeJUMP(){
-
-
-  set_sprite_data(0, MAX_SPRITE, JUDGEJUMP);
-
-  set_sprite_tile(0, 0);
-  move_sprite(0, posXJudge-8, posYJudge-8);
-  
-  set_sprite_tile(1, 1);
-  move_sprite(1, posXJudge-8, posYJudge);
-
-  set_sprite_tile(2, 2);
-  move_sprite(2, -5, -5);
-
-
-  set_sprite_tile(3, 3);
-  move_sprite(3, posXJudge, posYJudge);
-
-  set_sprite_tile(4, 4);
-  move_sprite(4, posXJudge-8, posYJudge+8);
-
-  set_sprite_tile(5, 5);
-  move_sprite(5, posXJudge-8, posYJudge+16);
-
-
-  set_sprite_tile(6, 6);
-  move_sprite(6, posXJudge, posYJudge+8);
-
-  set_sprite_tile(7, 7);
-  move_sprite(7, posXJudge, posYJudge+16);
-
-  set_sprite_tile(8, 8);
-  move_sprite(8, -5, -5);
-
-  set_sprite_tile(9, 9);
-  move_sprite(9, posXJudge+8, posYJudge);
-
-  set_sprite_tile(10, 10);
-  move_sprite(10, -5, -5);
-
-  set_sprite_tile(11, 11);
-  move_sprite(11, -5, -5);
-
-
-  set_sprite_tile(12, 12);
-  move_sprite(12, posXJudge+8, posYJudge+8);
-
-
-
-  set_sprite_tile(13, 13);
-  move_sprite(13, posXJudge+8, posYJudge+16);
-
-  set_sprite_tile(14, 14);
-  move_sprite(14, -5, -5);
-
-  set_sprite_tile(15, 15);
-  move_sprite(15, -5, -5);
-
-  set_win_tiles(3, 0, 1, 1, jumpLook);
-
-}
 
 void drawJudgeWalk1(){
 
@@ -332,7 +358,7 @@ void drawJudgeWalk1(){
 
   set_sprite_tile(0, 0);
   move_sprite(0, posXJudge-8, posYJudge-8);
-  
+
   set_sprite_tile(1, 1);
   move_sprite(1, posXJudge-8, posYJudge);
 
@@ -394,7 +420,7 @@ void drawJudgeWalk2(){
 
   set_sprite_tile(0, 0);
   move_sprite(0, posXJudge-8, posYJudge-8);
-  
+
   set_sprite_tile(1, 1);
   move_sprite(1, posXJudge-8, posYJudge);
 
@@ -643,21 +669,21 @@ void BanditAttack(UBYTE numero, UBYTE posX, UBYTE posY){
   }  else if(bandits[numero].timerAnimationAttackBandit >= 0 && bandits[numero].timerAnimationAttackBandit < MAX_TIMER/2){
     drawBanditAttack2(numero+1, posX, posY);
     if(isHurt == 0){
-       isHurt = 1;
-    }
-   
+     isHurt = 1;
+   }
 
 
 
-  }
 
-  bandits[numero].timerAnimationAttackBandit--;
+ }
 
-  if (bandits[numero].timerAnimationAttackBandit <= 0){
+ bandits[numero].timerAnimationAttackBandit--;
 
-    bandits[numero].timerAnimationAttackBandit = MAX_TIMER;
+ if (bandits[numero].timerAnimationAttackBandit <= 0){
 
-  }
+  bandits[numero].timerAnimationAttackBandit = MAX_TIMER;
+
+}
 }
 
 void BanditDie(UBYTE numero, UBYTE posX, UBYTE posY){
@@ -666,18 +692,18 @@ void BanditDie(UBYTE numero, UBYTE posX, UBYTE posY){
   bandits[numero].isAttackingBandit = 0;
 
 
-   drawBanditDead(numero+1, posX, posY);
- 
+  drawBanditDead(numero+1, posX, posY);
 
 
- bandits[numero].timerAnimationDyingBandit--;
 
- if(bandits[numero].timerAnimationDyingBandit <= 0){
-  bandits[numero].timerAnimationDyingBandit = MAX_TIMER;
-  drawBanditDead(numero+1, -5, -5);
-  bandits[numero].pv = 0;
-  
-}
+  bandits[numero].timerAnimationDyingBandit--;
+
+  if(bandits[numero].timerAnimationDyingBandit <= 0){
+    bandits[numero].timerAnimationDyingBandit = MAX_TIMER;
+    drawBanditDead(numero+1, -5, -5);
+    bandits[numero].pv = 0;
+
+  }
 
 
 }
@@ -697,9 +723,9 @@ void JudgeDoHurt(){
     isHurt = 0;
     JudgePV--;
     posXJudge -= 8;
-     drawJudgeHurt();
+    drawJudgeHurt();
   }
-  
+
 
 
 }
@@ -708,12 +734,12 @@ void JudgeWalk(){
 
   isWalking = 1;
 
-  if(isJumping == 0 && isAttacking == 0 && isHurt == 0){
+  if(isAttacking == 0 && isHurt == 0){
     if(TimerAnimationWalk >= MAX_TIMER/2){
       drawJudgeWalk1();
     } else if(TimerAnimationWalk >= 0 && TimerAnimationWalk < MAX_TIMER/2){
       drawJudgeWalk2();
-    } 
+    }
 
     TimerAnimationWalk--;
 
@@ -734,7 +760,6 @@ void JudgeGroundAttack(){
   } else if(TimerAnimationAttack >= 0 && TimerAnimationAttack < MAX_TIMER/2){
     drawJudgeAttack2();
     checkColliderHammerAttack();
-
   }
 
   TimerAnimationAttack--;
@@ -748,28 +773,11 @@ void JudgeGroundAttack(){
 
 }
 
-void JudgeDoJump(){
-
-  if(TimerAnimationJump > MAX_TIMER/2){
-   drawJudgeJUMP();
-   posYJudge -= JudgeJumbSpeed;
-
- }
- else if(TimerAnimationJump >= 0 && TimerAnimationJump <= MAX_TIMER/2){
-   drawJudgeJUMP();
-   posYJudge += JudgeJumbSpeed;
- }
-
- TimerAnimationJump--;
-
- if(TimerAnimationJump <= 0){
-  TimerAnimationJump = MAX_TIMER;
-  isJumping = 0;
-  
+void JudgeSendSentence(){
+  drawjudgeShockWave();
 }
 
 
-}
 void initBandits(){
 
   for(i = 0; i < NB_BANDIT; i++){
@@ -791,56 +799,109 @@ void initBandits(){
 
 }
 
+void generateBanditsST(){
+
+  bandits[2].isNotHere = 0;
+  bandits[1].isNotHere = 0;
+  bandits[0].isNotHere = 0;
+
+  for(i = 0; i < NB_BANDIT; i++){
+    if(bandits[i].pv == 0){
+      bandits[i].pv = 1;
+      bandits[i].isDyingBandit = 0;
+      bandits[i].PosX = borderRight + 50 + (rand() % 50);
+      bandits[i].timerAnimationDyingBandit = MAX_TIMER;
+      bandits[i].timerAnimationAttackBandit = MAX_TIMER;
+      bandits[i].timerAnimationWalkBandit = MAX_TIMER;
+      do{
+        bandits[i].PosY = rand() % SCREENHEIGHT+40;
+      }while(bandits[i].PosY > SCREENHEIGHT+40 || bandits[i].PosY < (borderTop*2)+48);
+
+      if(i > 0){
+        do{
+          bandits[i].PosY = rand() % SCREENHEIGHT+40;
+        }while(bandits[i].PosY == bandits[i-1].PosY || bandits[i].PosY > SCREENHEIGHT+40 || bandits[i].PosY < (borderTop*2)+48);
+      }
+
+      bandits[i].t = i+1;
+
+      bandits[i].comportement = 1;
+
+      bandits[i].isWalkingBandit = 1;
+
+      pickComportement = rand() % 100;
+      if(pickComportement > 20){
+        bandits[i].speed = 1;
+      }else{
+        bandits[i].speed = 2;
+      }
+
+    }
+
+  }
+}
 void generateBandits(){
 
-  UBYTE nbBanditToDraw = 3;
 
-  if(ScoreDistance <= 50){
-    nbBanditToDraw = NB_BANDIT ;
-  } else if(ScoreDistance <= 100){
-   nbBanditToDraw = NB_BANDIT - 1;
- } else if (ScoreDistance > 100){
-   nbBanditToDraw = NB_BANDIT;
- }
+  if(score_bandit <= 5){
+    bandits[2].isNotHere = 1;
+    bandits[1].isNotHere = 1;
+    bandits[0].isNotHere = 0;
+  } else if(score_bandit <= 10){
+    bandits[2].isNotHere = 1;
+    bandits[1].isNotHere = 0;
+    bandits[0].isNotHere = 0;
+  } else if (score_bandit > 15){
+    bandits[2].isNotHere = 0;
+    bandits[1].isNotHere = 0;
+    bandits[0].isNotHere = 0;
 
- for(i = 0; i < nbBanditToDraw; i++){
-  if(bandits[i].pv == 0){
-    bandits[i].pv = 1;
-    bandits[i].isDyingBandit = 0;
-    bandits[i].PosX = borderRight +16;
-    bandits[i].timerAnimationDyingBandit = MAX_TIMER;
-    bandits[i].timerAnimationAttackBandit = MAX_TIMER;
-    bandits[i].timerAnimationWalkBandit = MAX_TIMER;
-    do{
-      bandits[i].PosY = rand() % borderBottom;
-    }while(bandits[i].PosY > borderBottom+16 || bandits[i].PosY < borderTop+16);
+  }
 
-    if(i > 0){
+
+
+  for(i = 0; i < NB_BANDIT; i++){
+    if(bandits[i].pv == 0){
+      bandits[i].pv = 1;
+      bandits[i].isDyingBandit = 0;
+      bandits[i].PosX = borderRight +16;
+      bandits[i].timerAnimationDyingBandit = MAX_TIMER;
+      bandits[i].timerAnimationAttackBandit = MAX_TIMER;
+      bandits[i].timerAnimationWalkBandit = MAX_TIMER;
       do{
         bandits[i].PosY = rand() % borderBottom;
-      }while(bandits[i].PosY == bandits[i-1].PosY || bandits[i].PosY > borderBottom+16 || bandits[i].PosY < borderTop+16);
-    }
+      }while(bandits[i].PosY > borderBottom+16 || bandits[i].PosY < borderTop+16);
 
-    bandits[i].t = i+1;
+      if(i > 0){
+        do{
+          bandits[i].PosY = rand() % borderBottom;
+        }while(bandits[i].PosY == bandits[i-1].PosY || bandits[i].PosY > borderBottom+16 || bandits[i].PosY < borderTop+16);
+      }
 
-    pickComportement = rand() % 100;
-    if(pickComportement > 99){
-      bandits[i].comportement = 1;
-    }else{
-      bandits[i].comportement = 2;
+      bandits[i].t = i+1;
+
+      pickComportement = rand() % 100;
+      if(pickComportement > 99){
+        bandits[i].comportement = 1;
+      }else{
+        bandits[i].comportement = 2;
+      }
+      bandits[i].isWalkingBandit = 1;
+
     }
-    bandits[i].isWalkingBandit = 1;
 
   }
 
 }
 
-}
 
 void moveBandits(){
 
   for(i = 0; i < NB_BANDIT; i++){
-    if(bandits[i].pv == 1){
+    if(bandits[i].isNotHere == 1){
+      BanditWalk(bandits[i].t-1,-50, -50);
+    }
+    else if(bandits[i].pv == 1){
 
       if(bandits[i].isDyingBandit == 0){
         if(bandits[i].isWalkingBandit == 1){
@@ -851,9 +912,6 @@ void moveBandits(){
             break;
 
             case BANDIT_FOLLOW:
-            if(isJumping == 0){
-              bandits[i].PosY = posYJudge+16;
-            }
 
             bandits[i].PosX -= bandits[i].speed;
             break;
@@ -863,13 +921,14 @@ void moveBandits(){
 
         if(bandits[i].PosX < borderLeft){
           bandits[i].pv = 0;
+          if(gameIsLaunch == 1){
+            score_villager--;
+          }
+          
         }
         if(bandits[i].PosX < posXJudge+8 && bandits[i].PosX > posXJudge && bandits[i].PosY < posYJudge+24  && bandits[i].PosY > posYJudge+8){
-          if(isJumping == 0){
+          BanditAttack(bandits[i].t-1, bandits[i].PosX, bandits[i].PosY);
 
-            BanditAttack(bandits[i].t-1, bandits[i].PosX, bandits[i].PosY);
-
-          }
 
         }else{
           bandits[i].isWalkingBandit = 1;
@@ -887,46 +946,37 @@ void moveBandits(){
 
 }
 
+
+
 void checkColliderHammerAttack(){
 
-  for(i = 0; i < NB_BANDIT; i++){
+  for(i = 0; i < nbBanditToDraw; i++){
     if(bandits[i].pv == 1 && bandits[i].isDyingBandit == 0){
       if(bandits[i].PosX < posXJudge+8 && bandits[i].PosX > posXJudge && bandits[i].PosY < posYJudge+24  && bandits[i].PosY > posYJudge+8){
         bandits[i].isDyingBandit = 1;
 
+        score_bandit++;
         score_bandit_digitUn++;
-        if(score_bandit_digitUn > 9){
-          score_bandit_digitUn = 0;
-          score_bandit_digitDeux++;
-        }
-        if(score_bandit_digitDeux > 9){
-          score_bandit_digitDeux = 0;
-          score_bandit_digitTrois++;
-        }
-        if(score_bandit_digitTrois > 9){
-          score_bandit_digitUn = 0;
-          score_bandit_digitDeux = 0;
-          score_bandit_digitTrois = 0;
-        }
- 
-      } 
+        checkBanditScore();
+
+      }
     }
   }
 
 }
 void checkCollideBorder(UBYTE newPosX, UBYTE newPosY){
 
-  if(isJumping == 0){
 
-    if(newPosY < borderTop){
-      posYJudge = borderTop;
-    }
 
-    if(newPosY > borderBottom){
-      posYJudge = borderBottom;
-    }
-
+  if(newPosY < borderTop){
+    posYJudge = borderTop;
   }
+
+  if(newPosY > borderBottom){
+    posYJudge = borderBottom;
+  }
+
+
 
   if(newPosX > borderRight){
     posXJudge = borderRight;
@@ -945,20 +995,21 @@ void moveJudge(){
       if(isAttacking == 0){
         posXJudge += JudgeSpeed;
       }
-      
+
       checkCollideBorder(posXJudge, posYJudge);
       JudgeWalk();
     }
     if(joypad() & J_UP){
-      if(isJumping == 0 && isAttacking == 0){
+
+      if(isAttacking == 0){
         posYJudge -= JudgeSpeed;
+        checkCollideBorder(posXJudge, posYJudge);
+        JudgeWalk();
       }
-      checkCollideBorder(posXJudge, posYJudge);
-      JudgeWalk();
 
     }
     if(joypad() & J_DOWN){
-      if(isJumping == 0 && isAttacking == 0){
+      if(isAttacking == 0){
         posYJudge += JudgeSpeed;
       }
       checkCollideBorder(posXJudge, posYJudge);
@@ -969,29 +1020,33 @@ void moveJudge(){
       if(isAttacking == 0){
         posXJudge -= JudgeSpeed;
       }
-      
+
       checkCollideBorder(posXJudge, posYJudge);
       JudgeWalk();
     }
     if(joypad() & J_A){
-      if(isJumping == 0 && isAttacking == 0){
-        isJumping = 1;
-      }
-    }
-    if(joypad() & J_B){
-      if(isJumping == 0){
-        isAttacking = 1;
-      }
-    }
-  }else{
+      isAttacking = 1;
 
-    isWalking = 0;
-  }
-
-  if(isHurt == 1){
-      JudgeDoHurt();
+     
+   }
+   if(joypad() & J_B){
+    if(shockSend == 0){
+      shockSend = 1;
+      isAttacking = 1;
+             sound_jump();
+      JudgeSendSentence();
+    }
 
   }
+}else{
+
+  isWalking = 0;
+}
+
+if(isHurt == 1){
+  JudgeDoHurt();
+
+}
 
 
 }
@@ -1004,12 +1059,12 @@ void scrollCity(){
   if(TimerScrollBKG % 2 == 0){
     scroll_bkg(1,0);
     posXJudge--;
-    for(i = 0; i < NB_BANDIT; i++){
+    for(i = 0; i < nbBanditToDraw; i++){
       bandits[i].PosX--;
     }
 
     checkCollideBorder(posXJudge, posYJudge);
-  } 
+  }
 
   TimerScrollBKG--;
 
@@ -1022,37 +1077,42 @@ void scrollCity(){
 
 void drawScoreBandit(){
 
-    set_win_tiles(50, 0, 1, 1, zero+score_bandit_digitUn);
-    set_win_tiles(49, 0, 1, 1, zero+score_bandit_digitDeux);
-    set_win_tiles(48, 0, 1, 1, zero+score_bandit_digitTrois);
+  set_win_tiles(50, 0, 1, 1, zero+score_bandit_digitUn);
+  set_win_tiles(49, 0, 1, 1, zero+score_bandit_digitDeux);
+  set_win_tiles(48, 0, 1, 1, zero+score_bandit_digitTrois);
 
 }
-void drawScoreDistance(){
-    set_win_tiles(44, 0, 1, 1, zero+score_distance_digitUn);
-    set_win_tiles(43, 0, 1, 1, zero+score_distance_digitDeux);
-    set_win_tiles(42, 0, 1, 1, zero+score_distance_digitTrois);
+void drawScoreVillager(){
+  set_win_tiles(45, 0, 1, 1, zero+score_villager_digitUn);
+  set_win_tiles(44, 0, 1, 1, zero+score_villager_digitDeux);
 }
 
-void calculateScoreDistance(){
-    if(distance > 155){
-      score_distance_digitUn++;
-      distance = 0;
+void calculateScoreVillager(){
+
+  if(score_villager == 10){
+    score_villager_digitDeux = 1;
+    score_villager_digitUn = 0;
+  } else if (score_villager == 9){
+    score_villager_digitDeux = 0;
+    score_villager_digitUn = 9;
+  } else if (score_villager < 9){
+    score_villager_digitUn = score_villager;
+  } 
+
+  if (score_villager <= 0){
+    isGameOver = 1;
+  }
+
+
+}
+
+void drawShock(){
+    if(shockSend == 1){
+      set_win_tiles(41, 0, 1, 1, emptyIcon);
+    }else {
+      set_win_tiles(41, 0, 1, 1, shockIcon);
     }
-
-    if(score_distance_digitUn > 9){
-      score_distance_digitUn = 0;
-      score_distance_digitDeux++;
-    } else if(score_distance_digitDeux > 9){
-      score_distance_digitDeux = 0;
-      score_distance_digitTrois++;
-    } else if(score_distance_digitTrois > 9){
-      score_distance_digitUn = 0;
-      score_distance_digitDeux = 0;
-      score_distance_digitTrois = 0;
-    }
-
 }
-
 void drawPv(){
   switch(JudgePV){
     case 3:
@@ -1081,76 +1141,265 @@ void drawPv(){
     set_win_tiles(38, 0, 1, 1, heartEmpty);
     set_win_tiles(37, 0, 1, 1, heartEmpty);
 
+    isGameOver = 1;
+
     break;
   }
 
 }
+void EcranStart()
+{
 
+  HIDE_SPRITES;
+  posXJudge =   borderLeft - 50;
+  posYJudge =   borderTop - 50;
+  posXShock = posXJudge;
+  posYJudge = posYJudge;
+  drawJudgeIDLE();
+
+  HIDE_WIN;
+  SHOW_BKG;
+  DISPLAY_OFF;
+  set_bkg_data(0, 43 + 41, decors_data);
+
+
+  set_bkg_tiles(0, 0, 20, 20, TitleScreen);
+
+  DISPLAY_ON;
+
+  generateBanditsST();
+  moveBandits();
+  moveShockWave();
+  SHOW_SPRITES;
+
+  do{
+   generateBanditsST();
+   moveBandits();
+
+
+
+ }while(joypad() != J_START);
+
+
+}
+
+void showScore(){
+
+  HIDE_SPRITES;
+  posXJudge =   borderLeft - 50;
+  posYJudge =   borderTop - 50;
+  posXShock = posXJudge;
+  posYJudge = posYJudge;
+  drawJudgeIDLE();
+
+  HIDE_WIN;
+  SHOW_BKG;
+  DISPLAY_OFF;
+  set_bkg_data(0, 104, decors_data);
+
+
+  set_bkg_tiles(0, 0, 20, 20, ScoreScreen);
+  move_bkg(0, 0); //HUD
+  DISPLAY_ON;
+
+
+
+  do{
+
+ }while(joypad() != J_A);
+
+}
+void showGameOver(){
+
+ if(score_bandit > bestScore){
+  bestScore = score_bandit;
+ }
+
+ HIDE_WIN;
+ SHOW_BKG;
+ SHOW_SPRITES;
+ DISPLAY_OFF;
+
+ set_win_tiles(0, 0, 5, 2, GameOver);
+ HIDE_SPRITES;
+ SHOW_BKG;
+ SHOW_WIN;
+
+  move_win(15, 22); //HUD
+
+
+
+  DISPLAY_ON;
+  do{
+
+
+
+  }while(joypad() != J_A);
+
+
+}
+
+
+void clearBkgAndWin(){
+  DISPLAY_OFF;
+
+  for(i = 0; i < 30; i++){
+    for(j = 0; j < 30; j++){
+     set_bkg_tiles(i, j, 1, 1, 0x0E);
+   }
+ }
+
+ for(i = 0; i < 30; i++){
+  for(j = 0; j < 30; j++){
+   set_win_tiles(i, j, 1, 1, 0x0E);
+ }
+}
+move_bkg(0,0);
+DISPLAY_ON;
+}
+
+void initGame(){
+  isGameOver = 0;
+  gameIsLaunch = 1;
+  shockSend = 0;
+  JudgePV = 3;
+  score_villager = 10;
+  score_villager_digitUn = 0;
+  score_villager_digitDeux = 1;
+
+  score_bandit_digitUn = 0;
+  score_bandit_digitDeux = 0;
+  score_bandit_digitTrois = 0;
+  score_bandit = 0;
+
+  posXJudge = 80;
+  posYJudge = 100;
+
+ posXShock = posXJudge;
+ posYShock = posYJudge;
+}
 int main(){
+
+
   UWORD seed;
   seed = DIV_REG;
   initarand(seed);
+
+
+
+
   SPRITES_8x8;
 
+  NR52_REG = 0xF8U;
+  NR51_REG = 0x00U;
+    NR50_REG = 0x77U;//0xFFU;
+
+    set_bkg_data(0, 15, logoTiles);
+    clearBkgAndWin();
+    set_win_tiles(0, 0, 7, 3, logoWin);
+
+      move_win(SCREENWIDTH/2 - (3*8), SCREENHEIGHT/2 - (2*8)); //HUD
+
+      SHOW_BKG;
+      SHOW_WIN;
 
 
 
-  DISPLAY_OFF;
-  DISPLAY_ON;
-  HIDE_BKG;
-  HIDE_SPRITES;
-  HIDE_WIN;
 
-  set_bkg_data(0, 43 + 26, decors_data);
+      delay(2000);
+      wait_vbl_done();
+
+  SPRITES_8x8;
+    DISPLAY_OFF;
+    HIDE_BKG;
+    HIDE_SPRITES;
+    HIDE_WIN;
+    set_bkg_data(0, 14, BenMetTiles);
+    clearBkgAndWin();
+    set_win_tiles(0, 0, 9, 4, BenMetLogo);
+
+      move_win(SCREENWIDTH/2 - (3*8), SCREENHEIGHT/2 - (2*8)); //HUD
+
+      SHOW_BKG;
+      SHOW_WIN;
+      DISPLAY_ON;
 
 
-  set_bkg_tiles(0, 0, 32, 16, CityMap);
 
 
-  set_win_tiles(0, 0, 20, 2, HUD_MAP);
-  SHOW_SPRITES;
-  SHOW_BKG;
-  SHOW_WIN;
+      delay(2000);
+      wait_vbl_done();
+
+
+
+
+
+      while(1)
+      {
+
+    NR10_REG = 0x34U; // 4th bit indicates if freq increases or decreases
+              // bits 5th-7th indicate sweep delay
+
+    clearBkgAndWin();
+    DISPLAY_OFF;
+    DISPLAY_ON;
+    HIDE_BKG;
+    HIDE_SPRITES;
+    HIDE_WIN;
+    initBandits();
+
+    EcranStart();
+
+    initGame();
+    initBandits();
+
+    set_bkg_data(0, 104, decors_data);
+
+
+    set_bkg_tiles(0, 0, 32, 16, CityMap);
+
+
+    set_win_tiles(0, 0, 20, 2, HUD_MAP);
+    SHOW_SPRITES;
+    SHOW_BKG;
+    SHOW_WIN;
 
   move_win(7, borderBottom + 22); //HUD
 
 
 
 
-
-
-  initBandits();
-
-  while(1)
-  {
-
-   distance++;
+  while(isGameOver == 0){
    drawScoreBandit();
    drawPv();
-   calculateScoreDistance();
-   drawScoreDistance();
+   drawShock();
+   calculateScoreVillager();
+   drawScoreVillager();
    scrollCity();
    generateBandits();
    moveJudge();
+   if(shockSend == 1){
+       moveShockWave();
+   }
 
-   if(isJumping == 1){
-    if(isHurt == 0){
-      JudgeDoJump();
-    }
 
-  }
 
-  if(isAttacking == 1){
+   if(isAttacking == 1){
     JudgeGroundAttack();
   }
 
-  if(isJumping == 0 && isWalking == 0 && isAttacking == 0 && isHurt == 0){
+  if(isWalking == 0 && isAttacking == 0 && isHurt == 0){
     drawJudgeIDLE();
   }
 
   moveBandits();
 
   SHOW_SPRITES;
+}
+gameIsLaunch = 0;
+//showGameOver();
+showScore();
+
 }
 return 0;
 
