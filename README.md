@@ -1,4 +1,4 @@
-<h1 align="center"> Inquisition :video_game: :space_invader:h1>
+<h1 align="center"> Inquisition :video_game: :space_invader: <h1>
 
 <img src="https://img.shields.io/badge/platform-gameboy-yellowgreen" />
 <img src="https://img.shields.io/badge/language-c-lightgrey" />
