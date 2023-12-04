@@ -61,7 +61,7 @@ UBYTE isWalking = 0;
 UBYTE isAttacking = 0;
 UBYTE isHurt = 0;
 UBYTE i = 0;
-UBYTE  j = 0;
+UBYTE j = 0;
 
 UBYTE borderRight = SCREENWIDTH-4;
 UBYTE borderLeft = 4;
@@ -86,7 +86,7 @@ UBYTE bestScore = 0;
 
 
 
-void sound_jump(){
+void sound_atk(){
   NR52_REG = 0x80;
   NR51_REG = 0x11;
   NR50_REG = 0x77;
@@ -226,7 +226,7 @@ void drawJudgeAttack1(){
 
   if(shockSend == 0){
         set_win_tiles(3, 0, 1, 1, attackLook);
-    }
+  }
 
 
 }
@@ -731,7 +731,6 @@ void JudgeDoHurt(){
 }
 void JudgeWalk(){
 
-
   isWalking = 1;
 
   if(isAttacking == 0 && isHurt == 0){
@@ -966,8 +965,6 @@ void checkColliderHammerAttack(){
 }
 void checkCollideBorder(UBYTE newPosX, UBYTE newPosY){
 
-
-
   if(newPosY < borderTop){
     posYJudge = borderTop;
   }
@@ -1025,28 +1022,25 @@ void moveJudge(){
       JudgeWalk();
     }
     if(joypad() & J_A){
-      isAttacking = 1;
-
-     
-   }
-   if(joypad() & J_B){
-    if(shockSend == 0){
-      shockSend = 1;
-      isAttacking = 1;
-             sound_jump();
-      JudgeSendSentence();
+        isAttacking = 1;
     }
+    if(joypad() & J_B){
+      if(shockSend == 0){
+        shockSend = 1;
+        isAttacking = 1;
+              sound_atk();
+        JudgeSendSentence();
+      }
+
+    }
+  }else{
+    isWalking = 0;
+  }
+
+  if(isHurt == 1){
+    JudgeDoHurt();
 
   }
-}else{
-
-  isWalking = 0;
-}
-
-if(isHurt == 1){
-  JudgeDoHurt();
-
-}
 
 
 }
@@ -1109,7 +1103,7 @@ void calculateScoreVillager(){
 void drawShock(){
     if(shockSend == 1){
       set_win_tiles(41, 0, 1, 1, emptyIcon);
-    }else {
+    }else{
       set_win_tiles(41, 0, 1, 1, shockIcon);
     }
 }
@@ -1119,40 +1113,37 @@ void drawPv(){
     set_win_tiles(39, 0, 1, 1, heartFill);
     set_win_tiles(38, 0, 1, 1, heartFill);
     set_win_tiles(37, 0, 1, 1, heartFill);
-
     break;
 
     case 2:
     set_win_tiles(39, 0, 1, 1, heartEmpty);
     set_win_tiles(38, 0, 1, 1, heartFill);
     set_win_tiles(37, 0, 1, 1, heartFill);
-
     break;
 
     case 1:
     set_win_tiles(39, 0, 1, 1, heartEmpty);
     set_win_tiles(38, 0, 1, 1, heartEmpty);
     set_win_tiles(37, 0, 1, 1, heartFill);
-
     break;
 
     case 0:
     set_win_tiles(39, 0, 1, 1, heartEmpty);
     set_win_tiles(38, 0, 1, 1, heartEmpty);
     set_win_tiles(37, 0, 1, 1, heartEmpty);
-
     isGameOver = 1;
-
     break;
   }
 
 }
+
 void EcranStart()
 {
 
   HIDE_SPRITES;
-  posXJudge =   borderLeft - 50;
-  posYJudge =   borderTop - 50;
+
+  posXJudge = borderLeft - 50;
+  posYJudge = borderTop - 50;
   posXShock = posXJudge;
   posYJudge = posYJudge;
   drawJudgeIDLE();
@@ -1160,9 +1151,8 @@ void EcranStart()
   HIDE_WIN;
   SHOW_BKG;
   DISPLAY_OFF;
+
   set_bkg_data(0, 43 + 41, decors_data);
-
-
   set_bkg_tiles(0, 0, 20, 20, TitleScreen);
 
   DISPLAY_ON;
@@ -1170,22 +1160,20 @@ void EcranStart()
   generateBanditsST();
   moveBandits();
   moveShockWave();
+
   SHOW_SPRITES;
 
   do{
    generateBanditsST();
    moveBandits();
-
-
-
- }while(joypad() != J_START);
-
+  }while(joypad() != J_START);
 
 }
 
 void showScore(){
 
   HIDE_SPRITES;
+
   posXJudge =   borderLeft - 50;
   posYJudge =   borderTop - 50;
   posXShock = posXJudge;
@@ -1195,35 +1183,38 @@ void showScore(){
   HIDE_WIN;
   SHOW_BKG;
   DISPLAY_OFF;
+
   set_bkg_data(0, 104, decors_data);
 
 
   set_bkg_tiles(0, 0, 20, 20, ScoreScreen);
   move_bkg(0, 0); //HUD
+
   DISPLAY_ON;
 
 
 
   do{
-
- }while(joypad() != J_A);
+  }while(joypad() != J_A);
 
 }
+
 void showGameOver(){
 
- if(score_bandit > bestScore){
-  bestScore = score_bandit;
- }
+  if(score_bandit > bestScore){
+      bestScore = score_bandit;
+  }
 
- HIDE_WIN;
- SHOW_BKG;
- SHOW_SPRITES;
- DISPLAY_OFF;
+  HIDE_WIN;
+  SHOW_BKG;
+  SHOW_SPRITES;
+  DISPLAY_OFF;
 
- set_win_tiles(0, 0, 5, 2, GameOver);
- HIDE_SPRITES;
- SHOW_BKG;
- SHOW_WIN;
+  set_win_tiles(0, 0, 5, 2, GameOver);
+
+  HIDE_SPRITES;
+  SHOW_BKG;
+  SHOW_WIN;
 
   move_win(15, 22); //HUD
 
@@ -1231,9 +1222,6 @@ void showGameOver(){
 
   DISPLAY_ON;
   do{
-
-
-
   }while(joypad() != J_A);
 
 
@@ -1245,17 +1233,18 @@ void clearBkgAndWin(){
 
   for(i = 0; i < 30; i++){
     for(j = 0; j < 30; j++){
-     set_bkg_tiles(i, j, 1, 1, 0x0E);
-   }
- }
+      set_bkg_tiles(i, j, 1, 1, 0x0E);
+    }
+  }
 
- for(i = 0; i < 30; i++){
-  for(j = 0; j < 30; j++){
-   set_win_tiles(i, j, 1, 1, 0x0E);
- }
-}
-move_bkg(0,0);
-DISPLAY_ON;
+  for(i = 0; i < 30; i++){
+    for(j = 0; j < 30; j++){
+    set_win_tiles(i, j, 1, 1, 0x0E);
+    }
+  }
+
+  move_bkg(0,0);
+  DISPLAY_ON;
 }
 
 void initGame(){
@@ -1275,9 +1264,10 @@ void initGame(){
   posXJudge = 80;
   posYJudge = 100;
 
- posXShock = posXJudge;
- posYShock = posYJudge;
+  posXShock = posXJudge;
+  posYShock = posYJudge;
 }
+
 int main(){
 
 
@@ -1292,50 +1282,47 @@ int main(){
 
   NR52_REG = 0xF8U;
   NR51_REG = 0x00U;
-    NR50_REG = 0x77U;//0xFFU;
+  NR50_REG = 0x77U;
 
-    set_bkg_data(0, 15, logoTiles);
-    clearBkgAndWin();
-    set_win_tiles(0, 0, 7, 3, logoWin);
+  set_bkg_data(0, 15, logoTiles);
+  clearBkgAndWin();
+  set_win_tiles(0, 0, 7, 3, logoWin);
 
-      move_win(SCREENWIDTH/2 - (3*8), SCREENHEIGHT/2 - (2*8)); //HUD
+  move_win(SCREENWIDTH/2 - (3*8), SCREENHEIGHT/2 - (2*8)); //HUD
 
-      SHOW_BKG;
-      SHOW_WIN;
-
-
+  SHOW_BKG;
+  SHOW_WIN;
 
 
-      delay(2000);
-      wait_vbl_done();
+
+
+  delay(2000);
+  wait_vbl_done();
 
   SPRITES_8x8;
-    DISPLAY_OFF;
-    HIDE_BKG;
-    HIDE_SPRITES;
-    HIDE_WIN;
-    set_bkg_data(0, 14, BenMetTiles);
-    clearBkgAndWin();
-    set_win_tiles(0, 0, 9, 4, BenMetLogo);
+  DISPLAY_OFF;
+  HIDE_BKG;
+  HIDE_SPRITES;
+  HIDE_WIN;
 
-      move_win(SCREENWIDTH/2 - (3*8), SCREENHEIGHT/2 - (2*8)); //HUD
+  set_bkg_data(0, 14, BenMetTiles);
+  clearBkgAndWin();
+  set_win_tiles(0, 0, 9, 4, BenMetLogo);
+  move_win(SCREENWIDTH/2 - (3*8), SCREENHEIGHT/2 - (2*8)); //HUD
 
-      SHOW_BKG;
-      SHOW_WIN;
-      DISPLAY_ON;
+  SHOW_BKG;
+  SHOW_WIN;
+  DISPLAY_ON;
 
-
-
-
-      delay(2000);
-      wait_vbl_done();
+  delay(2000);
+  wait_vbl_done();
 
 
 
 
 
-      while(1)
-      {
+  while(1)
+  {
 
     NR10_REG = 0x34U; // 4th bit indicates if freq increases or decreases
               // bits 5th-7th indicate sweep delay
@@ -1364,43 +1351,45 @@ int main(){
     SHOW_BKG;
     SHOW_WIN;
 
-  move_win(7, borderBottom + 22); //HUD
+    move_win(7, borderBottom + 22); //HUD
 
 
 
 
-  while(isGameOver == 0){
-   drawScoreBandit();
-   drawPv();
-   drawShock();
-   calculateScoreVillager();
-   drawScoreVillager();
-   scrollCity();
-   generateBandits();
-   moveJudge();
-   if(shockSend == 1){
-       moveShockWave();
-   }
+    while(isGameOver == 0){
+      drawScoreBandit();
+      drawPv();
+      drawShock();
+      calculateScoreVillager();
+      drawScoreVillager();
+      scrollCity();
+      generateBandits();
+      moveJudge();
+      if(shockSend == 1){
+          moveShockWave();
+      }
 
 
 
-   if(isAttacking == 1){
-    JudgeGroundAttack();
-  }
+    if(isAttacking == 1){
+      JudgeGroundAttack();
+    }
 
-  if(isWalking == 0 && isAttacking == 0 && isHurt == 0){
-    drawJudgeIDLE();
-  }
+    if(isWalking == 0 && isAttacking == 0 && isHurt == 0){
+      drawJudgeIDLE();
+    }
 
-  moveBandits();
+    moveBandits();
 
-  SHOW_SPRITES;
+    SHOW_SPRITES;
 }
+
 gameIsLaunch = 0;
-//showGameOver();
+showGameOver();
 showScore();
 
 }
+
 return 0;
 
 }
